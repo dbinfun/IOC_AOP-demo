@@ -9,6 +9,8 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
 public @interface Controller {
-    String value() default "";// service name
+    String value() default "";// bean name
     BeanType type() default BeanType.original;
+
+    String path() default "";
 }

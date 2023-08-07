@@ -140,12 +140,13 @@ public class BeanFactory {
             throw new RuntimeException();
         }
     }
-    public static void addPostProcessor(Class<?> cls,Function<Object,Object> fun){
+    public static void addPostProcessor(Class<?> cls,Function<Object,Object> ...fun){
         List<Function<Object,Object>> funs = beanMethod.get(cls);
         if(funs==null){
-            funs = new ArrayList<>();
-            funs.add(fun);
+            funs = new ArrayList<>(Arrays.asList(fun));
             beanMethod.put(cls,funs);
+        }else{
+            funs.addAll(Arrays.asList(fun));
         }
     }
 }

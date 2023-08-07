@@ -1,5 +1,6 @@
 package net.dbinfun.ioc;
 
+import cn.hutool.http.HttpUtil;
 import net.dbinfun.ioc.annotation.Component;
 import net.dbinfun.ioc.annotation.Controller;
 import net.dbinfun.ioc.annotation.Service;
@@ -21,12 +22,14 @@ public class MyIOCApplication {
         }
         log.info("Application starting...");
         log.info("Application init...");
+        HttpServer.init(8080);
         List<Class<?>> classes = scanner(cls);
-
-        BeanFactory.addBeanAnnotation(Service.class, Controller.class, Component.class);// 设置要扫描的bean
+        BeanFactory.addBeanAnnotation(Service.class, Controller.class, Component.class, Controller.class);// 设置要扫描的bean
         BeanPostProcessor.todo();
         BeanFactory.createBean(classes); // 创建bean
         log.info("Application init success");
+        HttpServer.start();
+        log.info("listen on 8080");
         log.info("Application started");
     }
 

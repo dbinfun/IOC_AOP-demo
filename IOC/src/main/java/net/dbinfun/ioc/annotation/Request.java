@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
 public @interface Request {
-    String value() default "";// service name
+    String[] path() default {"/"};// service name
     BeanType type() default BeanType.original;
     RequestType requestType() default RequestType.GET;
 }

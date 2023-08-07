@@ -1,4 +1,4 @@
-package net.dbinfun.main;
+package net.dbinfun.main.bean;
 
 import net.dbinfun.ioc.annotation.Service;
 import net.dbinfun.ioc.beans.BeanType;

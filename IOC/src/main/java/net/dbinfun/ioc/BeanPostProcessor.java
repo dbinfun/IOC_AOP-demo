@@ -1,5 +1,10 @@
 package net.dbinfun.ioc;
 
+import cn.hutool.http.ContentType;
+import cn.hutool.http.HttpRequest;
+import cn.hutool.http.HttpResponse;
+import cn.hutool.json.JSON;
+import cn.hutool.json.JSONUtil;
 import net.dbinfun.ioc.annotation.*;
 import net.dbinfun.ioc.beans.BeanInfo;
 import net.dbinfun.ioc.beans.BeanType;
@@ -11,19 +16,18 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 public class BeanPostProcessor {
     private static final Logger log = LoggerFactory.getLogger(BeanPostProcessor.class);
     public static void todo(){
         add(Component.class, BeanPostProcessor::createBeanByMethod,BeanPostProcessor::autowired);
         add(Service.class,BeanPostProcessor::autowired);
-        add(Controller.class,BeanPostProcessor::autowired);
+        add(Controller.class,BeanPostProcessor::autowired,BeanPostProcessor::restController);
     }
 
     private static void add(Class<?> cls, Function<Object,Object> ...function){
-        for (Function<Object, Object> f : function) {
-            BeanFactory.addPostProcessor(cls,f);
-        }
+        BeanFactory.addPostProcessor(cls,function);
     }
     /**
      * 通过@Component下的@Bean注解创建bean
@@ -31,6 +35,7 @@ public class BeanPostProcessor {
      */
     private static Object createBeanByMethod(Object object) {
         Class<?> cls = object.getClass();
+        if(cls.getAnnotation(Component.class)==null) return object;
         Annotation annotation = cls.getAnnotation(Component.class);
         if (annotation!=null){
             Method[] methods = cls.getDeclaredMethods();
@@ -79,6 +84,56 @@ public class BeanPostProcessor {
                 } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
                     log.error("注入失败:{}",e.getMessage());
                 }
+            }
+        }
+        return object;
+    }
+
+    private static Object restController(Object object){
+        Class<?> cls =object.getClass();
+        if(cls.getAnnotation(Controller.class)==null) return object;
+        String basePath = String.valueOf(BeanUtil.getAnnotationValue(cls.getAnnotation(Controller.class),"path"));
+        Method[] methods = cls.getDeclaredMethods();// 获取公共方法。
+        for (Method method : methods) {
+            Annotation annotation = method.getAnnotation(Request.class);
+            if (annotation!=null){
+                String[] path = (String[]) BeanUtil.getAnnotationValue(annotation,"path");
+                HttpServer.addRequestMapping((req,res)->{
+                    try{
+                        // 获取method的返回类型
+                        Class<?> returnType = method.getReturnType();
+                        // 获取method的参数类型
+                        Class<?>[] parameterTypes = method.getParameterTypes();
+                        Object[] params = new Object[parameterTypes.length];
+                        for (int i=0;i<parameterTypes.length;i++){
+                            // request
+                            if(parameterTypes[i].equals(HttpRequest.class)){
+                                params[i] = req;
+                            }
+                            // response
+                            else if(parameterTypes[i].equals(HttpResponse.class)){
+                                params[i] = res;
+                            }
+                            // 其他bean,从容器中获取,如果需要其他如请求体之类的参数可以通过反射判断注解,从request中取
+                            else{
+                                params[i] = BeanFactory.getBean(parameterTypes[i]);
+                                if(params[i] == null){
+                                    throw new Exception("参数"+parameterTypes[i]+"未找到");
+                                }
+                            }
+                        }
+                        Object result = method.invoke(object,params);
+                        if(returnType!=void.class){
+                            if (!HttpServer.simpleType.contains(result.getClass())) {
+                                res.write(JSONUtil.toJsonStr(result), ContentType.JSON.toString());
+                            }else{
+                                res.write(String.valueOf(result), ContentType.TEXT_PLAIN.toString());
+                            }
+                        }
+                    }catch (Exception e) {
+                        log.error("调用方法失败:{}", e.getMessage());
+                    }
+                }, Stream.of(path).map(p->basePath+p).toArray(String[]::new));
             }
         }
         return object;
