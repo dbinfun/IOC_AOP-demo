@@ -10,7 +10,6 @@ import java.lang.annotation.Target;
 @Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
 public @interface Controller {
     String value() default "";// bean name
-    BeanType type() default BeanType.original;
 
     String path() default "";
 }

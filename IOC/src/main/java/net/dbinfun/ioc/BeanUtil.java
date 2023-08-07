@@ -58,7 +58,7 @@ public class BeanUtil {
                 // 获取a的value
                 beanType = (BeanType) getAnnotationValue(a, "type");
                 if (beanType == null) {
-                    log.error("获取bean名字失败，{}注解{}的type为空", clz.getName(), a.getClass().getName());
+                    beanType=BeanType.original;
                 }
                 break;
             }

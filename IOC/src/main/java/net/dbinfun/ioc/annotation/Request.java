@@ -1,6 +1,5 @@
 package net.dbinfun.ioc.annotation;
 
-import net.dbinfun.ioc.beans.BeanType;
 import net.dbinfun.ioc.beans.RequestType;
 
 import java.lang.annotation.ElementType;
@@ -11,6 +10,5 @@ import java.lang.annotation.Target;
 @Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
 public @interface Request {
     String[] path() default {"/"};// service name
-    BeanType type() default BeanType.original;
     RequestType requestType() default RequestType.GET;
 }
