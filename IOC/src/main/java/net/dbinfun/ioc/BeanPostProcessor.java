@@ -26,15 +26,16 @@ public class BeanPostProcessor {
         add(Controller.class,BeanPostProcessor::autowired,BeanPostProcessor::restController);
     }
 
-    private static void add(Class<?> cls, Function<Object,Object> ...function){
+    private static void add(Class<?> cls, Function<BeanInfo,Object> ...function){
         BeanFactory.addPostProcessor(cls,function);
     }
     /**
      * 通过@Component下的@Bean注解创建bean
-     * @param object bean
+     * @param beanInfo beanInfo
      */
-    private static Object createBeanByMethod(Object object) {
-        Class<?> cls = object.getClass();
+    private static Object createBeanByMethod(BeanInfo beanInfo) {
+        Object object = beanInfo.getObject();
+        Class<?> cls = beanInfo.getCls();
         if(cls.getAnnotation(Component.class)==null) return object;
         Annotation annotation = cls.getAnnotation(Component.class);
         if (annotation!=null){
@@ -48,8 +49,8 @@ public class BeanPostProcessor {
                     try {
                         Object  re=  method.invoke(object,params);
                         if (re!=null){
-                            BeanInfo beanInfo = new BeanInfo(beanName, BeanType.original,cls,re);
-                            BeanFactory.addBean(beanName,beanInfo);
+                            BeanInfo beanInfo2 = new BeanInfo(beanName, BeanType.original,cls,re);
+                            BeanFactory.addBean(beanName,beanInfo2);
                         }
                     } catch (IllegalAccessException | InvocationTargetException e) {
                         e.printStackTrace();
@@ -63,11 +64,12 @@ public class BeanPostProcessor {
 
     /**
      * 通过@Autowired注解注入bean
-     * @param object
+     * @param beanInfo beanInfo
      * @return
      */
-    private static Object autowired(Object object){
-        Class<?> cls = object.getClass();
+    private static Object autowired(BeanInfo beanInfo){
+        Object object = beanInfo.getObject();
+        Class<?> cls = beanInfo.getCls();
         Field[] fields = cls.getDeclaredFields();
         for (Field field : fields) {
             Annotation annotation = field.getAnnotation(Autowired.class);
@@ -89,8 +91,9 @@ public class BeanPostProcessor {
         return object;
     }
 
-    private static Object restController(Object object){
-        Class<?> cls =object.getClass();
+    private static Object restController(BeanInfo beanInfo){
+        Object object = beanInfo.getObject();
+        Class<?> cls = beanInfo.getCls();
         if(cls.getAnnotation(Controller.class)==null) return object;
         String basePath = String.valueOf(BeanUtil.getAnnotationValue(cls.getAnnotation(Controller.class),"path"));
         Method[] methods = cls.getDeclaredMethods();// 获取公共方法。

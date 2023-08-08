@@ -1,6 +1,7 @@
 package net.dbinfun.main.controller;
 
 import net.dbinfun.ioc.annotation.Controller;
+import net.dbinfun.main.aop.Log;
 import net.dbinfun.ioc.annotation.Request;
 import net.dbinfun.main.service.DateService;
 
@@ -10,6 +11,7 @@ import java.util.Map;
 @Controller(path = "/user")
 public class LoginController {
     @Request(path = "/login")
+    @Log
     public Object login(DateService dateService){
         Map<String,String> map = new HashMap<>();
         map.put("name","dbinfun");

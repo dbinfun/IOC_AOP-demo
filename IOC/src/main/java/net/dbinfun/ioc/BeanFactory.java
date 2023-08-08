@@ -9,12 +9,10 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class BeanFactory {
     private static final Logger log = LoggerFactory.getLogger(BeanFactory.class);
@@ -29,16 +27,28 @@ public class BeanFactory {
 
     public static final List<Class<?>> beanAnnotation = new ArrayList<>(); // 需要扫描为bean的注解
 
-    private static final Map<Class<?>, List<Function<Object,Object>>> beanMethod = new ConcurrentHashMap<>(); // bean方法,创建bean后调用
+    private static final Map<Class<?>, List<Function<BeanInfo,Object>>> postProcessor = new ConcurrentHashMap<>(); // 后置处理器,bean创建后做的工作
+    private static final Map<Predicate<Class<?>>, List<Function<Object,Object>>> proxyProcessor = new ConcurrentHashMap<>(); // 代理处理器,满足条件的bean创建代理对象
+    private static final Map<Predicate<Class<?>>, List<Function<Class<?>,Object>>> preProcessor = new ConcurrentHashMap<>(); // 前置处理器,再创建所有bean前做的工作
 
     public static void addBeanAnnotation(Class<?>... clz){
         beanAnnotation.addAll(Arrays.asList(clz));
     }
+    private static Boolean isCreatedOver = null;
 
     public static void createBean(List<Class<?>> clz) {
+        clz.forEach(cls-> {
+            preProcessor.forEach((k, v) -> {
+                if (k.test(cls)) {
+                    v.forEach(f -> f.apply(cls));
+                }
+            });
+        });
+        isCreatedOver = false;
         for(Class<?> c : clz){
             createBean(c);
         }
+        isCreatedOver = true;
     }
 
     public static Object getBean(String name) {
@@ -102,12 +112,13 @@ public class BeanFactory {
             throw new RuntimeException();
         }
         // 接下来创建bean
-        Object bean;
+        Object bean=null;
         BeanInfo beanInfo = new BeanInfo(beanName, beanType, cls, null);
         instantiatingBean.put(beanName, beanInfo); // 放入正在实例化的bean
         beanMap.put(beanName, beanInfo); // 放入所有bean
         try {
-            // 获取构造器
+
+                // 获取构造器
             Constructor<?>[] constructor = cls.getConstructors();
             if (constructor.length != 1) {
                 throw new NoSuchMethodException();
@@ -115,6 +126,14 @@ public class BeanFactory {
             // 获取构造器参数
             Object[] objects = getParams(constructor[0]);
             bean = constructor[0].newInstance(objects);// 实例化
+            // 代理对象处理
+            for(Predicate<Class<?>> pre:proxyProcessor.keySet()){
+                if(pre.test(cls)){
+                    for(Function<Object,Object> fun:proxyProcessor.get(pre)){
+                        bean = fun.apply(bean);
+                    }
+                }
+            }
             BeanInfo info = new BeanInfo(beanName, beanType, cls, bean);
             if (!alreadyInstantiatedBean.containsKey(info.getName()))alreadyInstantiatedBean.put(info.getName(), info);// 放入已经实例化的bean
             if(beanType==BeanType.original) {
@@ -123,10 +142,10 @@ public class BeanFactory {
             instantiatingBean.remove(info.getName());// 从正在实例化的bean中移除
             Annotation[] annotations = cls.getAnnotations();
             for (Annotation annotation : annotations) {
-                List<Function<Object,Object>> funs = beanMethod.get(annotation.annotationType());
+                List<Function<BeanInfo,Object>> funs = postProcessor.get(annotation.annotationType());
                 if (funs!=null) {
-                    for (Function<Object,Object> fun:funs){
-                        bean = fun.apply(bean);
+                    for (Function<BeanInfo,Object> fun:funs){
+                        bean = fun.apply(new BeanInfo(beanName, beanType, cls, bean));
                     }
                 }
             }
@@ -140,13 +159,64 @@ public class BeanFactory {
             throw new RuntimeException();
         }
     }
-    public static void addPostProcessor(Class<?> cls,Function<Object,Object> ...fun){
-        List<Function<Object,Object>> funs = beanMethod.get(cls);
+
+    /**
+     * 后置处理器
+     * @param cls 注解类
+     * @param fun 处理方法
+     */
+    public static void addPostProcessor(Class<?> cls,Function<BeanInfo,Object> ...fun){
+        if(isCreatedOver!=null){
+            log.error("后置处理器必须在创建bean之前添加");
+            return;
+        }
+        List<Function<BeanInfo,Object>> list = new LinkedList<>(Arrays.asList(fun));
+        List<Function<BeanInfo,Object>> funs = postProcessor.get(cls);
         if(funs==null){
-            funs = new ArrayList<>(Arrays.asList(fun));
-            beanMethod.put(cls,funs);
+            funs = list;
+            postProcessor.put(cls,funs);
         }else{
-            funs.addAll(Arrays.asList(fun));
+            funs.addAll(list);
+        }
+    }
+
+    /**
+     * 前置处理器
+     * @param predicate 匹配器
+     * @param fun 处理方法
+     */
+    public static void addPreprocessing(Predicate<Class<?>> predicate, Function<Class<?>,Object> ...fun){
+        if(isCreatedOver!=null){
+            log.error("前置处理器必须在创建bean之前添加");
+            return;
+        }
+        List<Function<Class<?>,Object>> list = new LinkedList<>(Arrays.asList(fun));
+        List<Function<Class<?>,Object>> predicates = preProcessor.get(predicate);
+        if(predicates==null) {
+            predicates = list;
+            preProcessor.put(predicate, predicates);
+        }else{
+            predicates.addAll(list);
+        }
+    }
+
+    /**
+     * 后置处理器
+     * @param predicate
+     * @param fun
+     */
+    public static void addProxyProcessing(Predicate<Class<?>> predicate, Function<Object,Object> ...fun){
+        if(isCreatedOver!=null){
+            log.error("后置处理器必须在创建bean之前添加");
+            return;
+        }
+        List<Function<Object,Object>> list = new LinkedList<>(Arrays.asList(fun));
+        List<Function<Object,Object>> predicates = proxyProcessor.get(predicate);
+        if(predicates==null) {
+            predicates = list;
+            proxyProcessor.put(predicate, predicates);
+        }else{
+            predicates.addAll(list);
         }
     }
 }

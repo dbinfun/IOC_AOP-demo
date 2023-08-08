@@ -38,6 +38,7 @@ public class MyIOCApplication {
         List<Class<?>> classes = new MyIOCApplication(cls,basePackage).scanner();
         BeanFactory.addBeanAnnotation(Service.class, Controller.class, Component.class, Controller.class);// 设置要扫描的bean
         BeanPostProcessor.todo();
+        AopMannager.init();
         BeanFactory.createBean(classes); // 创建bean
         log.info("Application init success");
         HttpServer.start();
