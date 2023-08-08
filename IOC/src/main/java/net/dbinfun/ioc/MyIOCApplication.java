@@ -1,6 +1,5 @@
 package net.dbinfun.ioc;
 
-import cn.hutool.http.HttpUtil;
 import net.dbinfun.ioc.annotation.Component;
 import net.dbinfun.ioc.annotation.Controller;
 import net.dbinfun.ioc.annotation.Service;
@@ -15,7 +14,20 @@ import java.util.stream.Collectors;
 
 public class MyIOCApplication {
     public static final Logger log = LoggerFactory.getLogger(MyIOCApplication.class);
+    private final Class<?> context;
+    private final String basePackage;
+    private MyIOCApplication(Class<?> context, String basePackage){
+        this.context = context;
+        this.basePackage = basePackage;
+    }
     public static void start(Class<?> cls, String[] args) {
+        String contextClassPath = cls.getPackage().getName().replace(".","/")+"/"+cls.getSimpleName()+".class";
+        String basePackage = Thread.currentThread()
+                .getContextClassLoader()
+                .getResource(contextClassPath)
+                .toString()// 获取实际启动类的路径
+                .replace(contextClassPath,"")
+                .replaceFirst("file:/","");
         if(cls==null) {
             log.error("No application class provided");
             return;
@@ -23,7 +35,7 @@ public class MyIOCApplication {
         log.info("Application starting...");
         log.info("Application init...");
         HttpServer.init(8080);
-        List<Class<?>> classes = scanner(cls);
+        List<Class<?>> classes = new MyIOCApplication(cls,basePackage).scanner();
         BeanFactory.addBeanAnnotation(Service.class, Controller.class, Component.class, Controller.class);// 设置要扫描的bean
         BeanPostProcessor.todo();
         BeanFactory.createBean(classes); // 创建bean
@@ -38,13 +50,13 @@ public class MyIOCApplication {
      * @param pkgName 指定包名
      * @return 指定包下的所有包名或者类名
      */
-    private static List<String> getPackageOrClass(String pkgName){
+    private List<String> getPackageOrClass(String pkgName){
         List<String> list = new LinkedList<>();
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-        String packagePath = pkgName.replace('.', '/');
+        String packagePath = basePackage+pkgName.replace('.', '/');
 
         // 在类路径下查找指定包的资源文件
-        File packageDir = new File(classLoader.getResource(packagePath).getFile());
+        File packageDir = new File(packagePath);
+
         if (packageDir.exists()) {
             // 获取目录下的所有文件（包括子目录）
             File[] files = packageDir.listFiles();
@@ -69,10 +81,9 @@ public class MyIOCApplication {
 
     /**
      * 扫描启动类同级包下的所有类
-     * @param cls 启动类
      */
-    private static List<Class<?>> scanner(Class<?> cls){
-        Package pkg = cls.getPackage();
+    private List<Class<?>> scanner(){
+        Package pkg = context.getPackage();
         String pkgName = pkg.getName();
         log.info("start scanning package...");
         List<String> list = getPackageOrClass(pkgName);
