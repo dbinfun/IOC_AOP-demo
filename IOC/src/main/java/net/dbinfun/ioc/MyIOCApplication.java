@@ -3,6 +3,7 @@ package net.dbinfun.ioc;
 import net.dbinfun.ioc.annotation.Component;
 import net.dbinfun.ioc.annotation.Controller;
 import net.dbinfun.ioc.annotation.Service;
+import net.dbinfun.ioc.annotation.aop.Advice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,7 @@ public class MyIOCApplication {
         log.info("Application init...");
         HttpServer.init(8080);
         List<Class<?>> classes = new MyIOCApplication(cls,basePackage).scanner();
-        BeanFactory.addBeanAnnotation(Service.class, Controller.class, Component.class, Controller.class);// 设置要扫描的bean
+        BeanFactory.addBeanAnnotation(Service.class, Controller.class, Component.class, Controller.class, Advice.class);// 设置要扫描的bean
         BeanPostProcessor.todo();
         AopMannager.init();
         BeanFactory.createBean(classes); // 创建bean

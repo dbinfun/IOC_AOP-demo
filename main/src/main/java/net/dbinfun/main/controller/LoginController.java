@@ -21,4 +21,9 @@ public class LoginController {
         map.put("date",dateService.getDate());
         return map;
     }
+    @Request(path = "/exception")
+    @Log
+    public Object exception(DateService dateService){
+        throw new RuntimeException("test exception");
+    }
 }

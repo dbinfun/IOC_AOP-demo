@@ -126,7 +126,7 @@ public class BeanPostProcessor {
                             }
                         }
                         Object result = method.invoke(object,params);
-                        if(returnType!=void.class){
+                        if(returnType!=void.class&&result!=null){
                             if (!HttpServer.simpleType.contains(result.getClass())) {
                                 res.write(JSONUtil.toJsonStr(result), ContentType.JSON.toString());
                             }else{
